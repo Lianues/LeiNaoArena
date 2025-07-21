@@ -88,17 +88,6 @@ def load_config():
         logger.error(f"加载或解析 'config.jsonc' 失败: {e}。将使用默认配置。")
         CONFIG = {}
 
-def load_model_map():
-    """从 models.json 加载模型映射。"""
-    global MODEL_NAME_TO_ID_MAP
-    try:
-        with open('models.json', 'r', encoding='utf-8') as f:
-            MODEL_NAME_TO_ID_MAP = json.load(f)
-        logger.info(f"成功从 'models.json' 加载了 {len(MODEL_NAME_TO_ID_MAP)} 个模型。")
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        logger.error(f"加载 'models.json' 失败: {e}。将使用空模型列表。")
-        MODEL_NAME_TO_ID_MAP = {}
-
 # --- 更新检查 ---
 GITHUB_REPO = "Lianues/LMArenaBridge"
 
@@ -181,123 +170,6 @@ def check_for_updates():
     except Exception as e:
         logger.error(f"检查更新时发生未知错误: {e}")
 
-# --- 模型更新 ---
-def extract_models_from_html(html_content):
-    """
-    从 HTML 内容中提取模型数据，采用更健壮的解析方法。
-    """
-    script_contents = re.findall(r'<script>(.*?)</script>', html_content, re.DOTALL)
-    
-    for script_content in script_contents:
-        if 'self.__next_f.push' in script_content and 'initialState' in script_content and 'publicName' in script_content:
-            match = re.search(r'self\.__next_f\.push\(\[1,"(.*?)"\]\)', script_content, re.DOTALL)
-            if not match:
-                continue
-            
-            full_payload = match.group(1)
-            
-            payload_string = full_payload.split('\\n')[0]
-            
-            json_start_index = payload_string.find(':')
-            if json_start_index == -1:
-                continue
-            
-            json_string_with_escapes = payload_string[json_start_index + 1:]
-            json_string = json_string_with_escapes.replace('\\"', '"')
-            
-            try:
-                data = json.loads(json_string)
-                
-                def find_initial_state(obj):
-                    if isinstance(obj, dict):
-                        for key, value in obj.items():
-                            if key == 'initialState' and isinstance(value, list):
-                                if value and isinstance(value[0], dict) and 'publicName' in value[0]:
-                                    return value
-                            result = find_initial_state(value)
-                            if result is not None:
-                                return result
-                    elif isinstance(obj, list):
-                        for item in obj:
-                            result = find_initial_state(item)
-                            if result is not None:
-                                return result
-                    return None
-
-                models = find_initial_state(data)
-                if models:
-                    logger.info(f"成功从脚本块中提取到 {len(models)} 个模型。")
-                    return models
-            except json.JSONDecodeError as e:
-                logger.error(f"解析提取的JSON字符串时出错: {e}")
-                continue
-
-    logger.error("错误：在HTML响应中找不到包含有效模型数据的脚本块。")
-    return None
-
-def compare_and_update_models(new_models_list, models_path):
-    """
-    比较新旧模型列表，打印差异，并用新列表更新本地 models.json 文件。
-    """
-    try:
-        with open(models_path, 'r', encoding='utf-8') as f:
-            old_models = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        old_models = {}
-
-    new_models_dict = {model['publicName']: model for model in new_models_list if 'publicName' in model}
-    old_models_set = set(old_models.keys())
-    new_models_set = set(new_models_dict.keys())
-
-    added_models = new_models_set - old_models_set
-    removed_models = old_models_set - new_models_set
-    
-    logger.info("--- 模型列表更新检查 ---")
-    has_changes = False
-
-    if added_models:
-        has_changes = True
-        logger.info("\n[+] 新增模型:")
-        for name in sorted(list(added_models)):
-            model = new_models_dict[name]
-            logger.info(f"  - 名称: {name}, ID: {model.get('id')}, 组织: {model.get('organization', 'N/A')}")
-
-    if removed_models:
-        has_changes = True
-        logger.info("\n[-] 删除模型:")
-        for name in sorted(list(removed_models)):
-            logger.info(f"  - 名称: {name}, ID: {old_models.get(name)}")
-
-    logger.info("\n[*] 共同模型检查:")
-    changed_models = 0
-    for name in sorted(list(new_models_set.intersection(old_models_set))):
-        new_id = new_models_dict[name].get('id')
-        old_id = old_models.get(name)
-        if new_id != old_id:
-            has_changes = True
-            changed_models += 1
-            logger.info(f"  - ID 变更: '{name}' 旧ID: {old_id} -> 新ID: {new_id}")
-    
-    if changed_models == 0:
-        logger.info("  - 共同模型的ID无变化。")
-
-    if not has_changes:
-        logger.info("\n结论: 模型列表无任何变化，无需更新文件。")
-        logger.info("--- 检查完毕 ---")
-        return
-
-    logger.info("\n结论: 检测到模型变更，正在更新 'models.json'...")
-    updated_model_map = {model['publicName']: model.get('id') for model in new_models_list if 'publicName' in model and 'id' in model}
-    try:
-        with open(models_path, 'w', encoding='utf-8') as f:
-            json.dump(updated_model_map, f, indent=4, ensure_ascii=False)
-        logger.info(f"'{models_path}' 已成功更新，包含 {len(updated_model_map)} 个模型。")
-        load_model_map()
-    except IOError as e:
-        logger.error(f"写入 '{models_path}' 文件时出错: {e}")
-    
-    logger.info("--- 检查与更新完毕 ---")
-
 # --- 自动重启逻辑 ---
 def restart_server():
     """优雅地通知客户端刷新，然后重启服务器。"""
@@ -375,7 +247,6 @@ async def lifespan(app: FastAPI):
     logger.info("="*60)
 
     check_for_updates() # 检查程序更新
-    load_model_map() # 加载模型ID映射
     load_model_endpoint_map() # 加载模型端点映射
     logger.info("服务器启动完成。等待油猴脚本连接...")
 
@@ -394,7 +265,7 @@ async def lifespan(app: FastAPI):
         app_logger=logger,
         channels=response_channels,
         app_config=CONFIG,
-        model_map=MODEL_NAME_TO_ID_MAP,
+        model_map={},
         default_model_id=DEFAULT_MODEL_ID
     )
 
@@ -553,7 +424,7 @@ def convert_openai_to_lmarena_payload(openai_data: dict, session_id: str, messag
     # 根据用户请求，强制使用已知的、能正常工作的模型ID，以进行测试。
     target_model_id = "f44e280a-7914-43ca-a25d-ecfcc5d48d09"
     logger.warning(f"DEBUG MODE: 强制使用模型ID -> {target_model_id}")
-    # target_model_id = MODEL_NAME_TO_ID_MAP.get(model_name, DEFAULT_MODEL_ID)
+    # target_model_id = DEFAULT_MODEL_ID
     
     # 4. 构建消息模板
     message_templates = []
@@ -847,54 +718,21 @@ async def websocket_endpoint(websocket: WebSocket):
         response_channels.clear()
         logger.info("WebSocket 连接已清理。")
 
-# --- 模型更新端点 ---
-@app.post("/update_models")
-async def update_models_endpoint(request: Request):
-    """
-    接收来自油猴脚本的页面 HTML，提取并更新模型列表。
-    """
-    html_content = await request.body()
-    if not html_content:
-        logger.warning("模型更新请求未收到任何 HTML 内容。")
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "message": "No HTML content received."}
-        )
-    
-    logger.info("收到来自油猴脚本的页面内容，开始检查并更新模型...")
-    new_models_list = extract_models_from_html(html_content.decode('utf-8'))
-    
-    if new_models_list:
-        compare_and_update_models(new_models_list, 'models.json')
-        # load_model_map() is now called inside compare_and_update_models
-        return JSONResponse({"status": "success", "message": "Model comparison and update complete."})
-    else:
-        logger.error("未能从油猴脚本提供的 HTML 中提取模型数据。")
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "message": "Could not extract model data from HTML."}
-        )
-
 # --- OpenAI 兼容 API 端点 ---
 @app.get("/v1/models")
 async def get_models():
     """提供兼容 OpenAI 的模型列表。"""
-    if not MODEL_NAME_TO_ID_MAP:
-        return JSONResponse(
-            status_code=404,
-            content={"error": "模型列表为空或 'models.json' 未找到。"}
-        )
-    
+    # Since models.json is removed, return a default or empty list.
+    # Returning a minimal list to keep clients happy.
     return {
         "object": "list",
         "data": [
             {
-                "id": model_name,
+                "id": "claude-3-5-sonnet-20241022",
                 "object": "model",
-                "created": int(asyncio.get_event_loop().time()),
+                "created": int(time.time()),
                 "owned_by": "LMArenaBridge"
             }
-            for model_name in MODEL_NAME_TO_ID_MAP.keys()
         ],
     }
 
@@ -1057,8 +895,8 @@ async def chat_completions(request: Request):
             detail="最终确定的会话ID或消息ID无效。请检查 'model_endpoint_map.json' 和 'config.jsonc' 中的配置，或运行 `id_updater.py` 来更新默认值。"
         )
 
-    if not model_name or model_name not in MODEL_NAME_TO_ID_MAP:
-        logger.warning(f"请求的模型 '{model_name}' 不在 models.json 中，将使用默认模型ID。")
+    # if not model_name or model_name not in MODEL_NAME_TO_ID_MAP:
+    #     logger.warning(f"请求的模型 '{model_name}' 不在 models.json 中，将使用默认模型ID。")
 
     request_id = str(uuid.uuid4())
     response_channels[request_id] = asyncio.Queue()
