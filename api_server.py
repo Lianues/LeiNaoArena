@@ -79,7 +79,7 @@ def load_config():
         CONFIG = {}
 
 # --- 更新检查 (保留) ---
-GITHUB_REPO = "Lianues/LMArenaBridge"
+GITHUB_REPO = "Lianues/LeiNaoArena"
 
 def download_and_extract_update(version):
     """下载并解压最新版本到临时文件夹。"""
