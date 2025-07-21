@@ -10,7 +10,7 @@ from . import elo_manager
 
 # --- 配置 ---
 DB_PATH = 'battle_sessions.db'
-MODEL_MAP_PATH = 'model_endpoint_map.json'
+MODELS_PATH = 'models.json' # 新的模型文件路径
 logger = logging.getLogger(__name__)
 
 def init_db():
@@ -39,20 +39,21 @@ def init_db():
 
 def _get_available_models():
     """
-    从 model_endpoint_map.json 加载并返回可用的模型ID列表。
+    从 models.json 加载并返回可用的模型ID列表。
     """
-    if not os.path.exists(MODEL_MAP_PATH):
-        logger.error(f"模型映射文件 '{MODEL_MAP_PATH}' 未找到。")
+    if not os.path.exists(MODELS_PATH):
+        logger.error(f"模型文件 '{MODELS_PATH}' 未找到。")
         return []
     try:
-        with open(MODEL_MAP_PATH, 'r', encoding='utf-8') as f:
-            content = f.read()
-            if not content.strip():
+        with open(MODELS_PATH, 'r', encoding='utf-8') as f:
+            models = json.load(f)
+            if isinstance(models, list):
+                return models
+            else:
+                logger.error(f"'{MODELS_PATH}' 的内容不是一个JSON列表。")
                 return []
-            model_map = json.loads(content)
-            return list(model_map.keys())
     except (json.JSONDecodeError, IOError) as e:
-        logger.error(f"加载或解析 '{MODEL_MAP_PATH}' 时出错: {e}", exc_info=True)
+        logger.error(f"加载或解析 '{MODELS_PATH}' 时出错: {e}", exc_info=True)
         return []
 
 def get_or_create_battle_session(rpid: str) -> tuple[str | None, str | None, str | None]:
