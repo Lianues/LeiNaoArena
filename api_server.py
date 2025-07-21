@@ -1,5 +1,5 @@
 # api_server.py
-# 新一代 LMArena - 对战专用服务器
+# 对战专用服务器
 
 import asyncio
 import json
