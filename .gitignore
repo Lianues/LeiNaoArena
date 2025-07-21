@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Databases
+*.db
+
+# Temporary files
+update_temp/
+
+# IDE files
+.vscode/

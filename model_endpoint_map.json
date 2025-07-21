@@ -1,0 +1,14 @@
+{
+  "gemini-2.5-pro": [
+    {
+      "session_id": "9117ac93-9d1c-4175-8f30-6fdff70de92a",
+      "message_id": "77373549-2a90-4f3d-9c3e-8840267e744a",
+      "mode": "direct_chat"
+    }
+  ],
+  "chatgpt-4o-latest-20250326": {
+      "session_id": "c5dd3509-af0f-4c58-a62d-968c34fa55a7",
+      "message_id": "9c12fb1b-37c4-48ab-bb35-b71a395234ed",
+      "mode": "direct_chat"
+    }
+}
