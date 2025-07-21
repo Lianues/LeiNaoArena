@@ -6,7 +6,7 @@ import random
 import logging
 import os
 from datetime import datetime
-import elo_manager
+from . import elo_manager
 
 # --- 配置 ---
 DB_PATH = 'battle_sessions.db'

@@ -25,9 +25,9 @@ from fastapi.responses import StreamingResponse, JSONResponse, Response
 
 # --- 导入自定义模块 ---
 from modules import image_generation
-import battle_db
-import battle_mode_handler
-import elo_manager
+from modules import battle_db
+from modules import battle_mode_handler
+from modules import elo_manager
 
 # --- 基础配置 ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

@@ -4,7 +4,7 @@ import logging
 import re
 # from fastapi.responses import JSONResponse # No longer needed here
 
-from battle_db import get_or_create_battle_session, record_battle_result, check_rpid_exists
+from .battle_db import get_or_create_battle_session, record_battle_result, check_rpid_exists
 
 logger = logging.getLogger(__name__)
 
